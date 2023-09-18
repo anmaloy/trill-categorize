@@ -68,15 +68,16 @@ def get_ni_analog(ni_bin_fn, chan_id):
 
 
 chan_id = 0
-binPath = Path('data\\NPX-S2-28_g0_t1.nidq.bin')
+fileName = 'NPX-S2-27'
+gate = 0
+binPath = Path(f'data\\{fileName}\\catgt_{fileName}_g{gate}\\{fileName}_g{gate}_tcat.nidq.bin')
 meta = readMeta(binPath)
 sRate = SampRate(meta)
 ftime = float(meta['fileTimeSecs'])
 
 ni_time, ni_data = get_ni_analog(binPath, chan_id)
-ni_time = ni_time*1000
-# height: good mV height for filtering out spikes, distance: ms between spikes converted for the x-axis here
-cutoff = 0.02
+# height: amplitude in v for filtering out spikes, distance: ms between spikes to avoid duplicates
+cutoff = 0.06
 distance = 10
 peaks, properties = find_peaks(ni_data, height=cutoff, distance=distance*sRate/1000)
 peaks_time = ni_time[peaks]
@@ -85,12 +86,13 @@ plt.plot(ni_time, ni_data, linewidth=0.1)
 plt.plot(peaks_time, ni_data[peaks], '.')
 plt.ylim(-0.4, 0.7)
 plt.axhline(y=cutoff, color='red')
-plt.xlabel('Times (ms)')
-plt.ylabel('Nerve (V)')
+plt.xlabel('Times (s)')
+plt.ylabel('Nerve (v)')
 plt.title('NIDAQ Nerve Spikes')
 plt.show()
 
-df = pd.DataFrame(columns=['time(ms)', 'amplitude(v)'])
-df['time(ms)'] = peaks_time
+df = pd.DataFrame(columns=['time(s)', 'amplitude(v)'])
+df['time(s)'] = peaks_time
 df['amplitude(v)'] = ni_data[peaks]
-df.to_csv('data\\NPX-S2-28_g0-data.csv', index=False)
+df.to_csv('data\\data.csv', index=False)
+df.to_csv(f'{fileName}_g{gate}-data.csv')
