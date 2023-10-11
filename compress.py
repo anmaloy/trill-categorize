@@ -7,6 +7,7 @@ from pathlib import Path
 def readMeta(binFullPath):
     metaName = binFullPath.stem + ".meta"
     metaPath = Path(binFullPath.parent / metaName)
+    print(metaPath)
     metaDict = {}
     if metaPath.exists():
         # print("meta file present")
@@ -34,11 +35,15 @@ def metaInfo(meta):
 
 print(f'Compressing .ap files')
 for file in glob.glob('**//*.ap.bin', recursive=True):
-    meta = readMeta(Path(file))
-    sRate, nChan = metaInfo(meta)
     stem = os.path.splitext(file)[0]
     base = os.path.basename(file)
     print(f'\tCompressing {base}')
+    try:
+        meta = readMeta(Path(file))
+    except KeyError:
+        print('KeyError: probably no meta file. Skipping.')
+        continue
+    sRate, nChan = metaInfo(meta)
     try:
         compress(file, f'{stem}.cbin', f'{stem}.ch', sample_rate=sRate, n_channels=nChan, dtype=np.int16)
         print(f'\t{base} compressed, removing original')
@@ -48,11 +53,15 @@ for file in glob.glob('**//*.ap.bin', recursive=True):
     
 print(f'Compressing .lf files')
 for file in glob.glob('**//*.lf.bin', recursive=True):
-    meta = readMeta(Path(file))
-    sRate, nChan = metaInfo(meta)
     stem = os.path.splitext(file)[0]
     base = os.path.basename(file)
     print(f'\tCompressing {base}')
+    try:
+        meta = readMeta(Path(file))
+    except KeyError:
+        print('KeyError: probably no meta file. Skipping.')
+        continue
+    sRate, nChan = metaInfo(meta)
     try:
         compress(file, f'{stem}.cbin', f'{stem}.ch', sample_rate=sRate, n_channels=nChan, dtype=np.int16)
         print(f'\t{base} compressed, removing original')
