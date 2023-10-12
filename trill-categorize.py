@@ -113,11 +113,10 @@ def select_features(data):
 
 
 def nu_net(data):
-    featTarg = ['amplitude(v)', 'hwidth(len)', 'hwidth(amp)', 'prominence', 'type']
+    featTarg = ['amplitude(v)', 'hwidth(len)', 'hwidth(amp)', 'prominence', 'thresholds', 'type']
     data = data[featTarg]
     X_train, X_test, y_train, y_test, le = prepare_data(data, 0, len(featTarg)-1)
     pred_df = pd.DataFrame(X_test, columns=featTarg)
-    pred_df['type'] = le.inverse_transform(y_test)
 
     sc = StandardScaler()
     X_train = sc.fit_transform(X_train)
@@ -132,6 +131,7 @@ def nu_net(data):
     classifier.fit(X_train, y_train)
 
     predictions = classifier.predict(X_test)
+    pred_df['type'] = le.inverse_transform(predictions)
 
     cm = confusion_matrix(y_test, predictions)
     cor = np.diagonal(cm).sum()
@@ -244,7 +244,7 @@ def spikes_chart(data, targets, nidaq_time, nidaq_data, cutoff):
         else:
             plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='black', alpha=0.75)
         plt.hlines(data['hwidth(amp)'][index], data['hwidth(start)'][index], data['hwidth(finish)'][index], color="C2")
-    plt.ylim(-0.4, 0.7)
+    plt.ylim(-0.4, 0.9)
     plt.axhline(y=cutoff, color='red', linewidth=0.3)
     legend = [mpatches.Patch(color='yellow', label='Intro Trill', alpha=0.5),
               mpatches.Patch(color='green', label='Fast Trill', alpha=0.5),
@@ -269,7 +269,7 @@ def spikes_chart(data, targets, nidaq_time, nidaq_data, cutoff):
     plt.show()
 
     # data.to_csv('data\\data.csv', index=False)
-    # data.to_csv(f'data\\{fileName}_g{gate}-data.csv', index=False)
+    data.to_csv(f'data\\{fileName}_g{gate}-data.csv', index=False)
 
 
 def scatter_matrix(data):
@@ -280,7 +280,7 @@ def scatter_matrix(data):
     plt.show()
 
 
-def get_peaks(nidaq_time, nidaq_data, cutoff=0.04, distance=10, delay=0):
+def get_peaks(nidaq_time, nidaq_data, cutoff=0.04, distance=10, delay=0, other=False):
     peaks, properties = find_peaks(nidaq_data, height=cutoff, threshold=0, distance=distance*sRate/1000)
     width_half = peak_widths(nidaq_data, peaks, rel_height=0.5)
     lst = list(width_half)
@@ -292,6 +292,8 @@ def get_peaks(nidaq_time, nidaq_data, cutoff=0.04, distance=10, delay=0):
     peaks_time = nidaq_time[peaks]
     prominence = peak_prominences(nidaq_data, peaks)[0]
     data, targets = populate_data(peaks_time, properties, width_half, prominence, delay)
+    if other is True:
+        data['type'] = data['type'].replace('nan', 'O')
     return data, targets, cutoff
 
 
@@ -319,26 +321,26 @@ def populate_data(peaks_time, properties, width_half, prominence, delay):
 
 channel = 0
 fileName = 'NPX-S2-39'
-gate = 0
-# +~55ms (27_g0), +~120 (27_g7) , +~59 (39_g0)
-t_delay = 59
+gate = 3
+# +~55ms (27_g0), +~120 (27_g7)
+t_delay = 0
 binPath = Path(f'data\\{fileName}\\catgt_{fileName}_g{gate}\\{fileName}_g{gate}_tcat.nidq.bin')
 binMeta = readMeta(binPath)
 sRate = SampRate(binMeta)
 ni_time, ni_data = get_ni_analog(binPath, channel)
 
-df, targetdf, p_cutoff = get_peaks(ni_time, ni_data, delay=t_delay)
+df, targetdf, p_cutoff = get_peaks(ni_time, ni_data, delay=t_delay, other=False)
+spikes_chart(df, targetdf, ni_time, ni_data, p_cutoff)
+# pdf = nu_net(df)
+# plist = pdf.index.tolist()
+#
+# tdf = df.iloc[plist].copy()
+# tdf['otype'] = df.iloc[plist]['type']
+# df['type'] = np.nan
+# tdf['type'] = pdf.type
+# df.update(tdf)
 # spikes_chart(df, targetdf, ni_time, ni_data, p_cutoff)
 
-pred_df = nu_net(df)
-plist = pred_df.index.tolist()
-tdf = df.replace('nan', pd.NA).dropna(axis=0).reset_index(drop=True)
-tdf = tdf.iloc[plist]
-# ~~ These 3 lines might wipe the original type data so the only plotted data is the correct guesses
-df['type'] = np.nan
-tdf['type'] = pred_df.type
-df.update(tdf)
-# ~~
-spikes_chart(df, targetdf, ni_time, ni_data, p_cutoff)
-
-
+# todo
+# pass filepath to get_peaks to dynamically name the targets csv it draws from, put them in individual data/targets
+# folders
