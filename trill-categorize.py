@@ -23,52 +23,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-
-
-def readMeta(bin_full_path):
-    metaName = bin_full_path.stem + ".meta"
-    metaPath = Path(bin_full_path.parent / metaName)
-    metaDict = {}
-    if metaPath.exists():
-        # print("meta file present")
-        with metaPath.open() as f:
-            mdatList = f.read().splitlines()
-            # convert the list entries into key value pairs
-            for m in mdatList:
-                csList = m.split(sep='=')
-                if csList[0][0] == '~':
-                    currKey = csList[0][1:len(csList[0])]
-                else:
-                    currKey = csList[0]
-                metaDict.update({currKey: csList[1]})
-    else:
-        print("no meta file")
-    return metaDict
-
-
-def Int2Volts(meta):
-    if meta['typeThis'] == 'imec':
-        fI2V = float(meta['imAiRangeMax'])/512
-    else:
-        fI2V = float(meta['niAiRangeMax'])/32768
-    return fI2V
-
-
-def SampRate(meta):
-    if meta['typeThis'] == 'imec':
-        srate = float(meta['imSampRate'])
-    else:
-        srate = float(meta['niSampRate'])
-    return srate
-
-
-def makeMemMapRaw(bin_full_path, meta):
-    nChan = int(meta['nSavedChans'])
-    nFileSamp = int(int(meta['fileSizeBytes'])/(2*nChan))
-    print("nChan: %d, nFileSamp: %d" % (nChan, nFileSamp))
-    rawData = np.memmap(bin_full_path, dtype='int16', mode='r',
-                        shape=(nChan, nFileSamp), offset=0, order='F')
-    return rawData
+from . import readSGLX
 
 
 def get_ni_analog(ni_bin_fn, chan_id):
@@ -78,11 +33,11 @@ def get_ni_analog(ni_bin_fn, chan_id):
     :param chan_id: channel index to load
     :return: analog_dat
     '''
-    meta = readMeta(Path(ni_bin_fn))
-    bitvolts = Int2Volts(meta)
-    ni_dat = makeMemMapRaw(ni_bin_fn, meta)
+    meta = readSGLX.readMeta(Path(ni_bin_fn))
+    bitvolts = readSGLX.Int2Volts(meta)
+    ni_dat = readSGLX.makeMemMapRaw(ni_bin_fn, meta)
     analog_dat = ni_dat[chan_id] * bitvolts
-    sr = SampRate(meta)
+    sr = readSGLX.SampRate(meta)
     tvec = np.linspace(0, len(analog_dat)/sr, len(analog_dat))
 
     return tvec, analog_dat
