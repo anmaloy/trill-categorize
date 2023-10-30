@@ -1,3 +1,8 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
 def map_event_to_time(events_df,t_exog,event_types=None):    
     """Maps a dataframe of events to individual samples in time.
     Given an events dataframe and a time vector, return a vector

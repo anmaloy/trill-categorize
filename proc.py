@@ -8,22 +8,31 @@ from scipy.ndimage import gaussian_filter1d
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 from pathlib import Path
+from . import readSGLX
+import glob
 
-def phy2spikes(ks2_dir):
-    '''
-    Given a phy directory, create the spikes and metrics dataframes. 
-    The spikes dataframe is a pandas dataframe with columns "ts","cell_id","cluster_id". 
-    "ts" is the time of a given spike
-    "cluster_id" is the KS2 assigned cluster identity associated with that spikes
-    "cell_id" is a remapped identifier for the unit a spike came from. cell_id maps one to one onto cluster_id, but takes values 0 to N, where N is the number of unique units
 
-    "cell_id" is used after filtering out bad units
-    
-    The metrics data frame gives cluster level information (such as probe location, spike amplitude, firing rate, QC metrics etc...)
+def binary_onsets(x,thresh):
     '''
-    #TODO: implement
-    pass
-    return(spikes,metrics)
+    Get the onset and offset samples of a binary signal (
+    :param x: signal
+    :param thresh: Threshold
+    :return: ons,offs
+    '''
+    xbool = x>thresh
+
+    ons = np.where(np.diff(xbool.astype('int'))==1)[0]
+    offs = np.where(np.diff(xbool.astype('int'))==-1)[0]
+    if xbool[0]:
+        offs = offs[1:]
+    if xbool[-1]:
+        ons = ons[:-1]
+    if len(ons)!=len(offs):
+        plt.plot(x)
+        plt.axhline(thresh)
+        raise ValueError('Onsets does not match offsets')
+
+    return(ons,offs)
 
 
 def bin_trains(ts,idx,max_time=None,binsize=0.05,start_time=5):
@@ -57,7 +66,7 @@ def bin_trains(ts,idx,max_time=None,binsize=0.05,start_time=5):
     return(raster,cell_id,bins)
 
 
-def compute_PCA_decomp(spikes,t0,tf,binsize=0.005,sigma=2):
+def compute_PCA_decomp(spikes,t0,tf,binsize=0.005,sigma=2,n_dims=10):
     '''
     Compute the PCA decomposition on the observed spiking
     :param spikes: A spikes dataframe
@@ -75,7 +84,7 @@ def compute_PCA_decomp(spikes,t0,tf,binsize=0.005,sigma=2):
     bb[np.isinf(bb)] = 0
     s0 = np.searchsorted(bins, t0)
     sf = np.searchsorted(bins, tf)
-    pca = PCA(10)
+    pca = PCA(n_dims)
     pca.fit(bb[s0:sf,:])
     X = pca.transform(bb)
     X_bins = bins
@@ -154,11 +163,3 @@ def get_eta(x,tvec,ts,pre_win=0.5,post_win=None):
            'ub':ub}
 
     return(eta)
-
-
-def parse_annotations(fn):
-    '''
-    Load and arrange the annotated compound action potential annotations
-    '''
-    #TODO: implement
-    pass
