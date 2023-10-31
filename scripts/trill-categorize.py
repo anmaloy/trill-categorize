@@ -1,3 +1,8 @@
+import sys
+sys.path.append('..')
+from src import readSGLX
+from src.io import get_ni_analog
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
@@ -23,8 +28,6 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-from .. import readSGLX
-from ..io import get_ni_analog
 
 def prepare_data(data, start=0, stop=0, drop=True):
     label_encoder = preprocessing.LabelEncoder()
