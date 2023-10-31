@@ -17,5 +17,8 @@ sys.path.append('..') # Add the parent directory which allows for imports within
 The code will likely continue with these lines, or something like them to import the project packages.
 `from src import io,proc`
 
-Use of the `click` package is preferred when making scripts which is very useful for including command line arguments:
+Use of the `click` package is preferred when making scripts which is very useful for including command line arguments.
+This prevents having to modify python files to run the same code on multiple datasets
 https://click.palletsprojects.com/en/8.1.x/
+
+There is an example of this kind of script called `example_script_click.py`
