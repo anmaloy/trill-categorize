@@ -1,13 +1,15 @@
 import pandas as pd
 from pathlib import Path
 import numpy as np
+import os
+import glob
 
-def get_XII_feats(gate_dir):
+def get_XII_feats(metadata_dir,gate_name):
     '''
     Load and arrange the annotated compound action potential annotations
     '''
-    data_fn = gate_dir.joinpath('data.csv')
-    if not data_fn.isfile():
+    data_fn = metadata_dir.joinpath(f'{gate_name}-data.csv')
+    if not data_fn.is_file():
         raise ValueError(f"No data.csv file found in {str(gate_dir)}")
     df = pd.read_csv(data_fn)
     return(df)
@@ -81,9 +83,17 @@ def load_phy(ks_dir, use_label='intersect'):
     else:
         print('NO SPIKETIMES_SEC FOUND. Converting and saving')
         t_samps = np.load(f'{ks_dir}/spike_times.npy').ravel()
-        ap_bin = glob.glob(f'{ks_dir}/../*ap.bin')[0]
-        meta = readSGLX.readMeta(Path(ap_bin))
-        spike_sr = readSGLX.SampRate(meta)
+        try:
+            ap_bin = glob.glob(f'{ks_dir}/../*ap.bin')[0]
+            meta = readSGLX.readMeta(Path(ap_bin))
+            spike_sr = readSGLX.SampRate(meta)
+        except:
+            param_fn = f'{ks_dir}/params.py'
+            with open(param_fn,'r') as fid:
+                ll = fid.readlines()
+            spike_sr = float(ll[-2][14:])
+            print(f'Using SR={spike_sr}')
+
         ts = t_samps/spike_sr
         with open(f'{ks_dir}/spike_times_sec.npy','wb') as fid:
             np.save(fid,ts)
@@ -111,11 +121,13 @@ def load_phy(ks_dir, use_label='intersect'):
         clu_list = grp.query('group=="good"')['cluster_id']
         spikes = spikes[spikes['cluster_id'].isin(clu_list)]
         metrics = metrics.merge(grp,on='cluster_id')
+        metrics = metrics[metrics['cluster_id'].isin(clu_list)]
     elif use_label == 'ks':
         grp = pd.read_csv(f'{ks_dir}/cluster_KSLabel.tsv', delimiter='\t')
         clu_list = grp.query('KSLabel=="good"')['cluster_id']
         spikes = spikes[spikes['cluster_id'].isin(clu_list)]
         metrics = metrics.merge(grp,on='cluster_id')
+        metrics = metrics[metrics['cluster_id'].isin(clu_list)]
     elif use_label == 'intersect':
         grp = pd.read_csv(f'{ks_dir}/cluster_group.tsv', delimiter='\t')
         kslabel = pd.read_csv(f'{ks_dir}/cluster_KSLabel.tsv', delimiter='\t')
@@ -146,6 +158,7 @@ def filter_by_metric(spikes,metrics,expression):
     '''
     clu_list = metrics.query(expression)['cluster_id']
     spikes = spikes[spikes['cluster_id'].isin(clu_list)]
+    spikes.reset_index(inplace=True,drop=True)
     metrics = metrics[metrics['cluster_id'].isin(clu_list)]
     return(spikes,metrics)
 
@@ -153,10 +166,13 @@ def filter_by_metric(spikes,metrics,expression):
 def run_default_filters(spikes,metrics):
     '''
     Run a battery of filters
+
+    amp default is 20
+    fr default is 0.1
     '''
     spikes,metrics = filter_by_metric(spikes,metrics,'isi_viol<0.1')
     spikes,metrics = filter_by_metric(spikes,metrics,'amplitude_cutoff<0.1')
-    spikes,metrics = filter_by_metric(spikes,metrics,'amplitude>50')
+    spikes,metrics = filter_by_metric(spikes,metrics,'amplitude>20')
     spikes,metrics = filter_by_metric(spikes,metrics,'firing_rate>0.1')
     spikes = resort_by_depth(spikes)
     return(spikes,metrics)
@@ -188,3 +204,18 @@ def load_filtered_phy(ks_dir):
     spikes,metrics = load_phy(ks_dir,use_label='ks')
     spikes,metrics = run_default_filters(spikes,metrics)
     return(spikes,metrics)
+
+def subsample_spikes(spikes,starts,ends):
+    '''
+    Takes a spike dict and keeps only the times between starts and ends
+    starts and ends must be the same length, and each entry of ends must be greater than starts
+    '''
+    
+    assert(len(starts)==len(ends))
+    assert(np.all(ends>starts))
+    idx = pd.Index([],dtype='int64')
+    
+    for start,end in zip(starts,ends):
+        dum = spikes.query('ts>@start & ts<@end')
+        idx = idx.union(dum.index.values)
+    return(spikes.loc[idx,:])

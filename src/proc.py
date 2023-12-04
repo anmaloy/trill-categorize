@@ -90,6 +90,21 @@ def compute_PCA_decomp(spikes,t0,tf,binsize=0.005,sigma=2,n_dims=10):
     X_bins = bins
     return(X,X_bins,pca)
 
+def compute_pca_raster(raster,sigma=2,n_dims=10):
+    '''
+    Does not perform the subsetting based on time
+    Operates on a N x T matrix
+    
+    '''
+    aa = gaussian_filter1d(raster, sigma=sigma, axis=1)
+    aa[np.isnan(aa)] = 0
+    bb = np.sqrt(aa).T
+    bb[np.isnan(bb)] = 0
+    bb[np.isinf(bb)] = 0
+    pca = PCA(n_dims)
+    pca.fit(bb)
+    X = pca.transform(bb)
+    return(X,pca)
 
 def remap_time_basis(x,x_t,y_t):
     '''
@@ -163,3 +178,23 @@ def get_eta(x,tvec,ts,pre_win=0.5,post_win=None):
            'ub':ub}
 
     return(eta)
+
+
+def label_time_vector(t,starts,ends,labels):
+    '''
+    Create a dataframe that labels each time point with a 
+    categorical label
+    '''
+    #TODO: assertions on starts,ends,labels
+    df = pd.DataFrame()
+    df['t'] = t
+    df['label'] = 'none'
+
+
+    for start,end,label in zip(starts,ends,labels):
+        idx = df.query('t>@start & t<=@end').index
+        df.loc[idx,'label'] = label
+    df['label_int'] = pd.factorize(df['label'])[0]
+    return(df)
+
+
