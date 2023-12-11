@@ -122,7 +122,8 @@ def main(rec_id,ks2_dir,probe_idx):
     spikes,metrics = io.load_filtered_phy(ks2_dir)
     slow_ap = compound_aps.query('type=="S"')
     fast_ap = compound_aps.query('type=="F"')
-    epochs = pd.read_csv(gate_dir.joinpath('epocs.csv'))
+    epochs_fn = list(gate_dir.glob('epoc*s.csv'))[0]
+    epochs = pd.read_csv(epochs_fn)
     trills = pd.read_csv(gate_dir.joinpath('compound_aps.csv'))
     trills['start'] = trills['start']/1000
     trills['end'] = trills['end']/1000
@@ -309,7 +310,7 @@ def main(rec_id,ks2_dir,probe_idx):
         sns.despine()
         plt.tight_layout()
         plt.savefig(save_fn.joinpath(f'sc_trill_{ii:03.0f}.png'),dpi=300,transparent=True,bbox_inches='tight')
-
+        plt.close('all')
     # ---------- Plot all units -------------- #
 
 
