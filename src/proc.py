@@ -10,6 +10,7 @@ from tqdm import tqdm
 from pathlib import Path
 from . import readSGLX
 import glob
+import matplotlib.pyplot as plt
 
 
 def binary_onsets(x,thresh):

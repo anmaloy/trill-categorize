@@ -33,3 +33,5 @@ def shade_events(gate_events,ax,alpha=0.3):
         sub_events = gate_events.query('type==@evt')
         for start,stop in zip(sub_events['start'],sub_events['end']):
             ax.axvspan(start,stop,color=colors[ii],alpha=alpha)
+
+
