@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 import os
 import glob
+import re
+DATA_ROOT = Path(r'Y:\projects\frog\data')
 
 def get_XII_feats(metadata_dir,gate_name):
     '''
@@ -45,13 +47,14 @@ def get_ni_fn(gate_dir):
     return(fn_list[0])
 
 
-def get_ks_dirs(gate_dir):
+def get_ks_dirs(gate_dir,verbose=True):
     '''
     Given a gate directory, return the phy folders for each probe
     '''
     probe_list = list(gate_dir.rglob('imec*_ks2'))
     n_probes = len(probe_list)
-    print(f'Number of probes is {n_probes}')
+    if verbose:
+        print(f'Number of probes is {n_probes}')
     return(probe_list)
 
 
@@ -63,6 +66,29 @@ def get_gate_dirs(run_dir):
     gate_list = list(run_dir.glob(f'*{run_name}*_g*'))
     return(gate_list)
 
+
+def gen_ks_list(data_root=DATA_ROOT):
+    '''
+    Generate a list and metadata of all recordings 
+    '''
+    ks_df = pd.DataFrame(columns=['run_dir','gate_dir','ks2_dir','run','gate','probe','rec_id'])
+    ii=0
+    run_dirs = list(data_root.glob('NPX*'))
+    for run_dir in run_dirs:
+        gate_dirs = get_gate_dirs(run_dir)
+        for gate_dir in gate_dirs:
+            ks2_dirs = get_ks_dirs(gate_dir,verbose=False)
+            for probe_idx,ks2_dir in enumerate(ks2_dirs):
+                idx = re.search('NPX*',gate_dir.name).start()
+                rec_id = gate_dir.name[idx:]
+                ks_df.loc[ii,'run_dir'] = run_dir
+                ks_df.loc[ii,'gate_dir'] = gate_dir
+                ks_df.loc[ii,'ks2_dir'] = ks2_dir
+                ks_df.loc[ii,'run'] = run_dir.name
+                ks_df.loc[ii,'gate'] = re.search('g\d+',gate_dir.name).group()
+                ks_df.loc[ii,'probe'] = re.search('imec\d',ks2_dir.name).group()
+                ks_df.loc[ii,'rec_id'] = rec_id + '_' + re.search('imec\d',ks2_dir.name).group()
+                ii+=1
 
 def load_phy(ks_dir, use_label='intersect'):
     '''
