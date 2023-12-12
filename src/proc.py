@@ -80,6 +80,8 @@ def compute_PCA_decomp(spikes,t0,tf,binsize=0.005,sigma=2,n_dims=10):
     raster, cell_id, bins = bin_trains(spikes['ts'], spikes['cell_id'], binsize=binsize)
     aa = gaussian_filter1d(raster, sigma=sigma, axis=1)
     aa[np.isnan(aa)] = 0
+    aa[aa<0] = 0
+
     bb = np.sqrt(aa).T
     bb[np.isnan(bb)] = 0
     bb[np.isinf(bb)] = 0
@@ -99,6 +101,7 @@ def compute_pca_raster(raster,sigma=2,n_dims=10):
     '''
     aa = gaussian_filter1d(raster, sigma=sigma, axis=1)
     aa[np.isnan(aa)] = 0
+    aa[aa<0] = 0
     bb = np.sqrt(aa).T
     bb[np.isnan(bb)] = 0
     bb[np.isinf(bb)] = 0

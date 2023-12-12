@@ -203,6 +203,8 @@ def load_filtered_phy(ks_dir):
     '''
     spikes,metrics = load_phy(ks_dir,use_label='ks')
     spikes,metrics = run_default_filters(spikes,metrics)
+    n_units = len(spikes['cell_id'].unique())      
+
     return(spikes,metrics)
 
 def subsample_spikes(spikes,starts,ends):
@@ -219,3 +221,32 @@ def subsample_spikes(spikes,starts,ends):
         dum = spikes.query('ts>@start & ts<@end')
         idx = idx.union(dum.index.values)
     return(spikes.loc[idx,:])
+
+def load_epochs(gate_dir):
+    '''
+    Load in the regions to analyze
+    '''
+    epochs_fn_list = list(gate_dir.glob('epoc*s.csv'))
+    if len(epochs_fn_list)==0:
+        raise ValueError('No epochs file found')
+    else:
+        epochs_fn = epochs_fn_list[0]
+    
+    epochs = pd.read_csv(epochs_fn).dropna()
+
+    assert epochs.shape[0]>0, 'No epochs found'
+    assert np.all(epochs['start analyses (s)']<epochs['end analyses (s)']), 'Start analyses are not all before end analyses'
+
+    return(epochs)
+
+def load_trills(gate_dir):
+    '''
+    Load in the manually determined trill periods
+    '''
+    trills = pd.read_csv(gate_dir.joinpath('compound_aps.csv'))
+    trills['start'] = trills['start']/1000
+    trills['end'] = trills['end']/1000
+    trills['duration'] = trills.eval('end-start')
+
+    assert np.all(trills['duration']>0),'Not all trill durations are positive'
+    return(trills)
