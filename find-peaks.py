@@ -39,26 +39,24 @@ def get_widths(nidaq_data, peaks, height):
     right = []
     out = []
     for peak in peaks:
-        left_cross = None
-        right_cross = None
-        left_amp = None
-        right_amp = None
+        lc = None
+        rc = None
         for i in range(peak):
             left_idx = peak - i
             right_idx = peak + i
-            if left_idx >= 0 and nidaq_data[left_idx] < height and not left_cross:
-                left_cross = left_idx
-                left_amp = nidaq_data[left_idx]
-            if right_idx < len(nidaq_data) and nidaq_data[right_idx] < height and not right_cross:
-                right_cross = right_idx
-                right_amp = nidaq_data[right_idx]
-            if left_cross and right_cross and left_amp and right_amp:
-                width = right_cross - left_cross
-                amp = np.mean([left_amp, right_amp])
+            if left_idx >= 0 and nidaq_data[left_idx] < height and not lc:
+                lc = left_idx + ((left_idx + 1) - left_idx) * (height - nidaq_data[left_idx]) \
+                     / (nidaq_data[left_idx + 1] - nidaq_data[left_idx])
+            if right_idx < len(nidaq_data) and nidaq_data[right_idx] < height and not rc:
+                rc = right_idx + (right_idx - (right_idx - 1)) * (height - nidaq_data[right_idx - 1]) \
+                     / (nidaq_data[right_idx] - nidaq_data[right_idx - 1])
+            if lc and rc:
+                width = rc - lc
+                amp = height
                 widths.append(width)
                 amps.append(amp)
-                left.append(left_cross)
-                right.append(right_cross)
+                left.append(lc)
+                right.append(rc)
                 break
     out.append(np.array(widths))
     out.append(np.array(amps))
