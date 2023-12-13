@@ -48,7 +48,7 @@ def readMeta(binFullPath):
                 metaDict.update({currKey: csList[1]})
     else:
         print("no meta file")
-    return(metaDict)
+    return metaDict
 
 
 # Return sample rate as python float.
@@ -60,7 +60,7 @@ def SampRate(meta):
         srate = float(meta['imSampRate'])
     else:
         srate = float(meta['niSampRate'])
-    return(srate)
+    return srate
 
 
 # Return a multiplicative factor for converting 16-bit file
@@ -74,7 +74,7 @@ def Int2Volts(meta):
         fI2V = float(meta['imAiRangeMax'])/512
     else:
         fI2V = float(meta['niAiRangeMax'])/32768
-    return(fI2V)
+    return fI2V
 
 
 # Return array of original channel IDs. As an example, suppose we want the
@@ -103,7 +103,7 @@ def OriginalChans(meta):
             else:
                 newChans = np.arange(int(currList[0]), int(currList[0])+1)
             chans = np.append(chans, newChans)
-    return(chans)
+    return chans
 
 
 # Return counts of each nidq channel type that composes the timepoints
@@ -115,7 +115,7 @@ def ChannelCountsNI(meta):
     MA = int(chanCountList[1])
     XA = int(chanCountList[2])
     DW = int(chanCountList[3])
-    return(MN, MA, XA, DW)
+    return MN, MA, XA, DW
 
 
 # Return counts of each imec channel type that composes the timepoints
@@ -126,7 +126,7 @@ def ChannelCountsIM(meta):
     AP = int(chanCountList[0])
     LF = int(chanCountList[1])
     SY = int(chanCountList[2])
-    return(AP, LF, SY)
+    return AP, LF, SY
 
 
 # Return gain for ith channel stored in nidq file.
@@ -139,7 +139,7 @@ def ChanGainNI(ichan, savedMN, savedMA, meta):
         gain = float(meta['niMAGain'])
     else:
         gain = 1    # non multiplexed channels have no extra gain
-    return(gain)
+    return gain
 
 
 # Return gain for imec channels.
@@ -162,7 +162,7 @@ def ChanGainsIM(meta):
             currList = imroList[i+1].split(sep=' ')
             APgain[i] = currList[3]
             LFgain[i] = currList[4]
-    return(APgain, LFgain)
+    return APgain, LFgain
 
 
 # Having accessed a block of raw nidq data using makeMemMapRaw, convert
@@ -188,7 +188,7 @@ def GainCorrectNI(dataArray, chanList, meta):
         conv = fI2V/ChanGainNI(j, MN, MA, meta)
         # dataArray contains only the channels in chanList
         convArray[i, :] = dataArray[i, :] * conv
-    return(convArray)
+    return convArray
 
 
 # Having accessed a block of raw imec data using makeMemMapRaw, convert
@@ -225,7 +225,7 @@ def GainCorrectIM(dataArray, chanList, meta):
             conv = 1
         # The dataArray contains only the channels in chList
         convArray[i, :] = dataArray[i, :]*conv
-    return(convArray)
+    return convArray
 
 
 def makeMemMapRaw(binFullPath, meta):
@@ -234,7 +234,7 @@ def makeMemMapRaw(binFullPath, meta):
     print("nChan: %d, nFileSamp: %d" % (nChan, nFileSamp))
     rawData = np.memmap(binFullPath, dtype='int16', mode='r',
                         shape=(nChan, nFileSamp), offset=0, order='F')
-    return(rawData)
+    return rawData
 
 
 # Return an array [lines X timepoints] of uint8 values for a
@@ -251,16 +251,16 @@ def ExtractDigital(rawData, firstSamp, lastSamp, dwReq, dLineList, meta):
         AP, LF, SY = ChannelCountsIM(meta)
         if SY == 0:
             print("No imec sync channel saved.")
-            digArray = np.zeros((0), 'uint8')
-            return(digArray)
+            digArray = np.zeros(0, 'uint8')
+            return digArray
         else:
             digCh = AP + LF + dwReq
     else:
         MN, MA, XA, DW = ChannelCountsNI(meta)
         if dwReq > DW-1:
             print("Maximum digital word in file = %d" % (DW-1))
-            digArray = np.zeros((0), 'uint8')
-            return(digArray)
+            digArray = np.zeros(0, 'uint8')
+            return digArray
         else:
             digCh = MN + MA + XA + dwReq
 
@@ -279,7 +279,7 @@ def ExtractDigital(rawData, firstSamp, lastSamp, dwReq, dLineList, meta):
         byteN, bitN = np.divmod(dLineList[i], 8)
         targI = byteN*8 + (7 - bitN)
         digArray[i, :] = bitWiseData[targI, :]
-    return(digArray)
+    return digArray
 
 
 # Sample calling program to get a file from the user,
@@ -355,7 +355,7 @@ def main():
         fig, ax = plt.subplots()
 
         for i in range(0, len(dLineList)):
-           ax.plot(tDat, digArray[i, :])
+            ax.plot(tDat, digArray[i, :])
         plt.show()
 
 

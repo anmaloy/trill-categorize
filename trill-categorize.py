@@ -23,8 +23,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-from .. import readSGLX
-from ..io import get_ni_analog
+from src import readSGLX
+from src.io import get_ni_analog
+
 
 def prepare_data(data, start=0, stop=0, drop=True):
     label_encoder = preprocessing.LabelEncoder()
@@ -206,7 +207,6 @@ def spikes_chart(data, targets, nidaq_time, nidaq_data, cutoff):
             plt.axvspan(row[1], row[2], color='grey', alpha=0.25)
     plt.show()
 
-    # data.to_csv('data\\data.csv', index=False)
     data.to_csv(f'data\\{fileName}_g{gate}-data.csv', index=False)
 
 
@@ -263,8 +263,8 @@ gate = 3
 # +~55ms (27_g0), +~120 (27_g7)
 t_delay = 0
 binPath = Path(f'data\\{fileName}\\catgt_{fileName}_g{gate}\\{fileName}_g{gate}_tcat.nidq.bin')
-binMeta = readMeta(binPath)
-sRate = SampRate(binMeta)
+binMeta = readSGLX.readMeta(binPath)
+sRate = readSGLX.SampRate(binMeta)
 ni_time, ni_data = get_ni_analog(binPath, channel)
 
 df, targetdf, p_cutoff = get_peaks(ni_time, ni_data, delay=t_delay, other=False)
