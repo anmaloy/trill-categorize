@@ -4,32 +4,7 @@ import numpy as np
 import pandas as pd
 
 from pathlib import Path
-from scipy.signal import find_peaks, peak_prominences, peak_widths
-
-from src.readSGLX import readMeta, SampRate
-from src.io import get_ni_analog
-
-
-def populate_data(peaks_time, properties, widths, prominence, delay):
-    targets = pd.read_csv(f'data\\targets\\{NIDAQ.fileName}_g{NIDAQ.gate}-targets.csv')
-    targets.start = (targets.start + delay) / 1000
-    targets.end = (targets.end + delay) / 1000
-    data = pd.DataFrame()
-
-    data['time(s)'] = peaks_time
-    data['amplitude(v)'] = properties['peak_heights']
-    data['delay(s)'] = data['time(s)'].diff()
-    data['width(len)'] = widths[0]
-    data['width(amp)'] = widths[1]
-    data['width(start)'] = widths[2]
-    data['width(finish)'] = widths[3]
-    data['prominence'] = prominence
-    data['thresholds'] = properties['left_thresholds'] + properties['right_thresholds']
-    lst = targets.apply(lambda row: (row['start'], row['end']), axis=1)
-    conditions = [(data['time(s)'] > x[0]) & (data['time(s)'] < x[1]) for x in lst]
-    choices = targets.type.values
-    data['type'] = np.select(conditions, choices, default=np.nan)
-    return data, targets
+from scipy.signal import find_peaks, peak_prominences
 
 
 def get_widths(nidaq_data, peaks, height):
@@ -65,27 +40,47 @@ def get_widths(nidaq_data, peaks, height):
     return out
 
 
-def get_peaks(nidaq_time, nidaq_data, cutoff, distance=10, delay=0, other=False):
-    peaks, properties = find_peaks(nidaq_data, height=cutoff, threshold=0, distance=distance * sRate / 1000)
-    widths = get_widths(nidaq_data, peaks, cutoff)
-    lst = list(widths)
-    lst[0] = lst[0] / sRate
-    lst[2:] = (x / sRate for x in lst[2:])
-    widths = tuple(lst)
-    peaks_time = nidaq_time[peaks]
-    prominence = peak_prominences(nidaq_data, peaks)[0]
-    data, targets = populate_data(peaks_time, properties, widths, prominence, delay)
-    if other is True:
-        data['type'] = data['type'].replace('nan', 'O')
-    return data, targets, cutoff
-
-
 class NIDAQ:
-    channel = 0
-    fileName = 'NPX-S2-39'
-    gate = 3
-    t_delay = 0
-    binPath = Path(f'data\\{fileName}\\catgt_{fileName}_g{gate}\\{fileName}_g{gate}_tcat.nidq.bin')
+
+    def __init__(self, fileName, gate):
+        self.fileName = fileName
+        self.gate = gate
+        self.binPath = Path(f'data\\{fileName}\\catgt_{fileName}_g{gate}\\{fileName}_g{gate}_tcat.nidq.bin')
+
+    def populate_data(self, peaks_time, properties, widths, prominence, delay):
+        targets = pd.read_csv(f'data\\targets\\{self.fileName}_g{self.gate}-targets.csv')
+        targets.start = (targets.start + delay) / 1000
+        targets.end = (targets.end + delay) / 1000
+        data = pd.DataFrame()
+
+        data['time(s)'] = peaks_time
+        data['amplitude(v)'] = properties['peak_heights']
+        data['delay(s)'] = data['time(s)'].diff()
+        data['width(len)'] = widths[0]
+        data['width(amp)'] = widths[1]
+        data['width(start)'] = widths[2]
+        data['width(finish)'] = widths[3]
+        data['prominence'] = prominence
+        data['thresholds'] = properties['left_thresholds'] + properties['right_thresholds']
+        lst = targets.apply(lambda row: (row['start'], row['end']), axis=1)
+        conditions = [(data['time(s)'] > x[0]) & (data['time(s)'] < x[1]) for x in lst]
+        choices = targets.type.values
+        data['type'] = np.select(conditions, choices, default=np.nan)
+        return data, targets
+
+    def get_peaks(self, nidaq_time, nidaq_data, cutoff, samplerate, distance=10, delay=0, other=False):
+        peaks, properties = find_peaks(nidaq_data, height=cutoff, threshold=0, distance=distance * samplerate / 1000)
+        widths = get_widths(nidaq_data, peaks, cutoff)
+        lst = list(widths)
+        lst[0] = lst[0] / samplerate
+        lst[2:] = (x / samplerate for x in lst[2:])
+        widths = tuple(lst)
+        peaks_time = nidaq_time[peaks]
+        prominence = peak_prominences(nidaq_data, peaks)[0]
+        data, targets = self.populate_data(peaks_time, properties, widths, prominence, delay)
+        if other is True:
+            data['type'] = data['type'].replace('nan', 'O')
+        return data, targets, cutoff
 
     def spikes_chart(self, data, targets, nidaq_time, nidaq_data, cutoff):
         data = data.replace('nan', pd.NA).dropna(axis=0)
@@ -130,11 +125,3 @@ class NIDAQ:
         plt.show()
 
         data.to_csv(f'data\\data\\{self.fileName}_g{self.gate}-data.csv', index=False)
-
-
-start = NIDAQ()
-binMeta = readMeta(start.binPath)
-sRate = SampRate(binMeta)
-ni_time, ni_data = get_ni_analog(start.binPath, start.channel)
-df, targetdf, p_cutoff = get_peaks(ni_time, ni_data, cutoff=(ni_data.std() * 2), delay=start.t_delay, other=False)
-start.spikes_chart(df, targetdf, ni_time, ni_data, p_cutoff)
