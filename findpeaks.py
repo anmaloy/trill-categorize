@@ -2,6 +2,7 @@ from scripts import findpeaks
 from src.readSGLX import readMeta, SampRate
 from src.io import get_ni_analog
 
+
 fileName = input('File Name: ')
 gate = input('Gate: ')
 

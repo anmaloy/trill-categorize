@@ -41,7 +41,6 @@ def get_widths(nidaq_data, peaks, height):
 
 
 class NIDAQ:
-
     def __init__(self, fileName, gate):
         self.fileName = fileName
         self.gate = gate
@@ -51,22 +50,17 @@ class NIDAQ:
         targets = pd.read_csv(f'data\\targets\\{self.fileName}_g{self.gate}-targets.csv')
         targets.start = (targets.start + delay) / 1000
         targets.end = (targets.end + delay) / 1000
-        data = pd.DataFrame()
 
-        data['time(s)'] = peaks_time
-        data['amplitude(v)'] = properties['peak_heights']
-        data['delay(s)'] = data['time(s)'].diff()
-        data['width(len)'] = widths[0]
-        data['width(amp)'] = widths[1]
-        data['width(start)'] = widths[2]
-        data['width(finish)'] = widths[3]
-        data['prominence'] = prominence
-        data['thresholds'] = properties['left_thresholds'] + properties['right_thresholds']
+        data = {'time(s)': peaks_time, 'amplitude(v)': properties['peak_heights'], 'width(len)': widths[0],
+                'width(amp)': widths[1], 'width(start)': widths[2], 'width(finish)': widths[3], 'prominence': prominence,
+                'thresholds': properties['left_thresholds'] + properties['right_thresholds']}
+        df = pd.DataFrame(data)
+
         lst = targets.apply(lambda row: (row['start'], row['end']), axis=1)
-        conditions = [(data['time(s)'] > x[0]) & (data['time(s)'] < x[1]) for x in lst]
+        conditions = [(df['time(s)'] > x[0]) & (df['time(s)'] < x[1]) for x in lst]
         choices = targets.type.values
-        data['type'] = np.select(conditions, choices, default=np.nan)
-        return data, targets
+        df['type'] = np.select(conditions, choices, default=np.nan)
+        return df, targets
 
     def get_peaks(self, nidaq_time, nidaq_data, cutoff, samplerate, distance=10, delay=0, other=False):
         peaks, properties = find_peaks(nidaq_data, height=cutoff, threshold=0, distance=distance * samplerate / 1000)
