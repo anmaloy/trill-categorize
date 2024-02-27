@@ -4,7 +4,9 @@ import numpy as np
 import os
 import glob
 import re
+import brainbox
 DATA_ROOT = Path(r'Y:\projects\frog\data')
+PROBE_MAP = {'imec0':'PBN','imec1':'Amb'}
 
 def get_XII_feats(metadata_dir,gate_name):
     '''
