@@ -1,9 +1,8 @@
 '''
 Go through each unit and compute the PCA plots
 '''
-
 import sys
-sys.path.append('..')
+sys.path.append('../')
 import click
 import pandas as pd
 from src import proc,io
@@ -15,16 +14,16 @@ from brainbox.processing import bincount2D
 import numpy as np
 import seaborn as sns
 
+
 # PLOT PARAMETERS
 f_trill_color = 'k'
 s_trill_color = 'tab:red'
 
 # Get data 
-METADATA_DIR =Path(r'Y:\projects\frog\data\meta_data')
-DATA_DIR = Path(r"Y:\projects\frog\data")
-PCA_BINSIZE=0.010
+DATA_DIR = Path('../../data')
+PCA_BINSIZE=0.025
 SIGMA = 1
-SAVE_ROOT = Path(r'Y:\projects\frog\xeno_npx\results\2023-12-11_pca')
+SAVE_ROOT = Path('../results/2024-02-27_pca/')
 SAVE_ROOT.mkdir(exist_ok=True)
 
 def prepare_for_pca(spikes,epochs,binsize):
@@ -49,63 +48,6 @@ def prepare_for_pca(spikes,epochs,binsize):
     max_spikes_per_bin = int(1/binsize)
     raster[raster>max_spikes_per_bin]= max_spikes_per_bin
     return(raster,cell_id,raster_bins)
-
-
-def ap_aligned_raster(spikes,compound_aps,n,f_trill_color='k',s_trill_color='tab:red',sort_by_delay=False,f=None,ax=None,xlim=(-100,100)):
-    '''
-    Plot the spike times of a given unit relative to the compound action potentials
-    '''
-    this_unit_spike_times = spikes.query('cell_id==@n')['ts'].values
-    ap_times = compound_aps['time(s)'].values
-    # Create a [n_cap x n_spikes] matrixs where each row is a compound action potential.
-    d_time = np.subtract.outer(this_unit_spike_times,ap_times)
-    d_time = d_time.T
-    color_vector = compound_aps['type'].map({'F':f_trill_color,'S':s_trill_color}).values
-    if f is None:
-        f = plt.figure(figsize=(2,5))
-    if ax is None:
-        ax = f.add_subplot(111)
-
-    if sort_by_delay:
-        ## This is to order by latency of first spike
-        # temp = d_time.copy()
-        # temp[temp<0] = np.inf
-        # latency = np.min(temp,1)
-        # latency_order = np.argsort(latency)
-        
-        ## This is to order by latency to next CAP
-        latency_order = np.argsort(compound_aps['t_to_next'].dropna()).values
-        for ii,jj in enumerate(latency_order):
-            rr = d_time[jj]
-            yy = np.ones(rr.shape) * ii
-            ax.plot(rr*1000,yy,'|',color=color_vector[jj])
-        ax.set_ylabel('CAP (Sorted)')
-    else:
-        for ii,rr in enumerate(d_time):
-            yy = np.ones(rr.shape) * ii
-            ax.plot(rr*1000,yy,'|',color=color_vector[ii])
-        ax.set_ylabel('CAP #')
-
-    ax.set_xlim(xlim)    
-    ax.axvline(0,color='c')
-    
-    ax.set_xlabel('Time (ms)')
-    
-    return(f,ax)
-
-def plot_peth(peth,ii,n_obs,color,f=None,ax=None):
-    '''
-    Convinience function to plot PETHS'''
-    if f is None and ax is None:
-        f = plt.figure()
-        ax = f.add_subplot(111)
-    if ax is None:
-        f.add_subplot(111)
-    ax.plot(peth['tscale']*1000,peth['means'][ii],color=color)
-    lb = peth['means'][ii] - peth['stds'][ii]/np.sqrt(n_obs)
-    ub = peth['means'][ii] + peth['stds'][ii]/np.sqrt(n_obs)
-    ax.fill_between(peth['tscale']*1000,lb,ub,color=color,alpha=0.5)
-    return(f,ax)
 
 
 def main(rec_id,ks2_dir,probe_idx):
@@ -142,9 +84,9 @@ def main(rec_id,ks2_dir,probe_idx):
 
     for label in trills_bins['label'].unique():
         idx = trills_bins.query('label==@label').index
-        ax12.plot(X[idx,0],X[idx,1],'.',c = cmap[label],alpha=0.5)
-        ax13.plot(X[idx,0],X[idx,2],'.',c = cmap[label],alpha=0.5)
-        ax23.plot(X[idx,2],X[idx,1],'.',c = cmap[label],alpha=0.5)
+        ax12.plot(X[idx,0],X[idx,1],'.',c = cmap[label],alpha=0.5,ms=2)
+        ax13.plot(X[idx,0],X[idx,2],'.',c = cmap[label],alpha=0.5,ms=2)
+        ax23.plot(X[idx,2],X[idx,1],'.',c = cmap[label],alpha=0.5,ms=2)
 
     ax12.set_xlabel('PC1')
     ax12.set_ylabel('PC2')
@@ -152,18 +94,30 @@ def main(rec_id,ks2_dir,probe_idx):
     ax13.set_ylabel('PC3')
     ax23.set_xlabel('PC3')
     ax23.set_ylabel('PC2')
+    
+    ax12.set_xlim(-4,4)
+    ax12.set_ylim(-4,4)
+    ax13.set_xlim(-4,4)
+    ax13.set_ylim(-4,4)
+    ax23.set_xlim(-4,4)
+    ax23.set_ylim(-4,4)
+    
+
     sns.despine()
     plt.tight_layout()
     plt.suptitle(f'{rec_id}')
     plt.savefig(save_fn,dpi=300,transparent=True,bbox_inches='tight')
     plt.close('all')
 
-if __name__ == '__main__':
+
+
+# Main run
+if __name__=='__main__':
     df_errors = pd.DataFrame()
     df_errors['err'] = []
     run_dirs = list(DATA_DIR.glob('NPX*'))
+    print(DATA_DIR)
     for run_dir in run_dirs:
-    
         gate_dirs = io.get_gate_dirs(run_dir)
         for gate_dir in gate_dirs:
             ks2_dirs = io.get_ks_dirs(gate_dir)
@@ -182,4 +136,4 @@ if __name__ == '__main__':
                     df_errors.to_csv(SAVE_ROOT.joinpath('err_log_pca.csv'))
                     print(f"Error on {uid}. Logging and continuing")
 
-                    
+                        

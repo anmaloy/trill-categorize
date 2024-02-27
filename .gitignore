@@ -1,2 +1,6 @@
 notebooks
+results
+data
+reports
+*.pyc
 .ipynb_checkpoints

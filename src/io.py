@@ -12,8 +12,10 @@ def get_XII_feats(metadata_dir,gate_name):
     '''
     data_fn = metadata_dir.joinpath(f'{gate_name}-data.csv')
     if not data_fn.is_file():
-        raise ValueError(f"No data.csv file found in {str(gate_dir)}")
+        raise ValueError(f"No data.csv file found in {str(gate_name)}")
     df = pd.read_csv(data_fn)
+    assert df.shape[0]>0, f"No compound APs found in {gate_name}-data.csv"
+
     return(df)
 
 
@@ -52,6 +54,7 @@ def get_ks_dirs(gate_dir,verbose=True):
     Given a gate directory, return the phy folders for each probe
     '''
     probe_list = list(gate_dir.rglob('imec*_ks2'))
+    probe_list.sort()
     n_probes = len(probe_list)
     if verbose:
         print(f'Number of probes is {n_probes}')
@@ -64,6 +67,7 @@ def get_gate_dirs(run_dir):
     '''
     run_name = run_dir.name
     gate_list = list(run_dir.glob(f'*{run_name}*_g*'))
+    gate_list.sort()
     return(gate_list)
 
 
@@ -74,6 +78,7 @@ def gen_ks_list(data_root=DATA_ROOT):
     ks_df = pd.DataFrame(columns=['run_dir','gate_dir','ks2_dir','run','gate','probe','rec_id'])
     ii=0
     run_dirs = list(data_root.glob('NPX*'))
+    run_dirs.sort()
     for run_dir in run_dirs:
         gate_dirs = get_gate_dirs(run_dir)
         for gate_dir in gate_dirs:
@@ -89,6 +94,7 @@ def gen_ks_list(data_root=DATA_ROOT):
                 ks_df.loc[ii,'probe'] = re.search('imec\d',ks2_dir.name).group()
                 ks_df.loc[ii,'rec_id'] = rec_id + '_' + re.search('imec\d',ks2_dir.name).group()
                 ii+=1
+    return(ks_df)
 
 def load_phy(ks_dir, use_label='intersect'):
     '''
