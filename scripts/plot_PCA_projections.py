@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from brainbox.processing import bincount2D
 import numpy as np
 import seaborn as sns
+import json
 
 
 # PLOT PARAMETERS
@@ -21,10 +22,12 @@ s_trill_color = 'tab:red'
 
 # Get data 
 DATA_DIR = Path('../../data')
-PCA_BINSIZE=0.025
+PCA_BINSIZE=0.02
 SIGMA = 1
 SAVE_ROOT = Path('../results/2024-02-27_pca/')
 SAVE_ROOT.mkdir(exist_ok=True)
+CALL_FR_THRESH = 5
+
 
 def prepare_for_pca(spikes,epochs,binsize):
     '''
@@ -47,6 +50,15 @@ def prepare_for_pca(spikes,epochs,binsize):
 
     max_spikes_per_bin = int(1/binsize)
     raster[raster>max_spikes_per_bin]= max_spikes_per_bin
+
+    # Remove units with low firing rates during calls:
+    mean_rate = raster.mean(1)/binsize
+    idx = mean_rate>CALL_FR_THRESH
+    raster = raster[idx,:]
+    cell_id = np.arange(np.sum(idx))
+    n_units = cell_id.max()
+    assert n_units>10, f'Number of units with FR above threshold {n_units=}is too few for PCA'
+
     return(raster,cell_id,raster_bins)
 
 
@@ -113,6 +125,10 @@ def main(rec_id,ks2_dir,probe_idx):
 
 # Main run
 if __name__=='__main__':
+    parameters = dict(PCA_BINSIZE=PCA_BINSIZE,SIGMA=SIGMA,CALL_FR_THRESH=CALL_FR_THRESH)
+    with open(SAVE_ROOT.joinpath('parameters.json'),'w') as fid:
+        json.dump(parameters,fid)
+
     df_errors = pd.DataFrame()
     df_errors['err'] = []
     run_dirs = list(DATA_DIR.glob('NPX*'))
