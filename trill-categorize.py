@@ -9,8 +9,6 @@ from src import readSGLX
 from src.io import get_ni_analog
 import matplotlib.cm as cm
 
-sys.path.append('')
-
 # Parameters and setup
 fileName = 'NPX-S2-39'
 gate = 3
@@ -57,7 +55,8 @@ for peak_time in df['time(s)']:
 window_array = np.array(window_array)
 scaler_waveform = StandardScaler()
 window_array_scaled = scaler_waveform.fit_transform(window_array)
-features = np.column_stack((window_array_scaled, np.square(df['width(len)']), np.square(df['thresholds']), df['frequency']))
+features = np.column_stack(
+    (window_array_scaled, np.square(df['width(len)']), np.square(df['thresholds']), df['frequency']))
 
 # Perform KMeans clustering
 kmeans = KMeans(n_clusters=n_clusters)
@@ -102,5 +101,34 @@ plt.show()
 # Apply density-based filtering
 filtered_df = peaks.filter_by_spike_density(df.copy(), time_window, min_spikes)
 
-# Plot final spikes with clusters
-peaks.spikes_chart(filtered_df, ni_time, ni_data, upper_thresh, lower_thresh)
+# Example usage
+time_window = 0.5  # 500 ms, the maximum time gap between spikes in the same zone
+merge_threshold = 0.05  # 50 ms
+buffer_size = 0.1  # 100 ms
+min_zone_length = 0.3  # 300ms
+
+
+# Step 1: Define zones based on spike proximity and cluster ID
+zone_df = peaks.define_zones(filtered_df, time_window)
+
+# Step 2: Adjust the zone boundaries to eliminate gaps and filter out very short zones
+adjusted_zone_df = peaks.adjust_zone_boundaries(zone_df, merge_threshold)
+adjusted_zone_df = adjusted_zone_df[(adjusted_zone_df['zone_end'] - adjusted_zone_df['zone_start']) >= min_zone_length]
+filtered_df = filtered_df[filtered_df.apply(lambda row: any(
+    (row['time(s)'] >= start) and (row['time(s)'] <= end)
+    for start, end in zip(adjusted_zone_df['zone_start'], adjusted_zone_df['zone_end'])), axis=1)]
+
+# Step 3: Plot the NIDAQ data with the adjusted zones
+peaks.spikes_chart(ni_time, ni_data, adjusted_zone_df, filtered_df, n_clusters, upper_thresh, lower_thresh)
+
+# Step 4: Request user input to name each cluster group
+cluster_names = {}
+for cluster_id in range(n_clusters):
+    cluster_name = input(f"What is cluster {cluster_id}? ")
+    cluster_names[cluster_id] = cluster_name
+
+# Step 5: Apply the names to the DataFrame
+adjusted_zone_df['cluster_id'] = adjusted_zone_df['cluster_id'].map(cluster_names)
+
+# Step 6: Save as CSV
+peaks.export_csv(adjusted_zone_df)

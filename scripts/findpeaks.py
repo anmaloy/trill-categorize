@@ -120,40 +120,54 @@ class NIDAQ:
             df['type'] = df['type'].replace('nan', 'O')
         return df
 
-    def spikes_chart(self, data, nidaq_time, nidaq_data, upper, lower):
+    def spikes_chart(self, nidaq_time, nidaq_data, zone_df, spike_df, n_clusters, upper, lower):
         """
-        Generate a plot of NIDAQ data with spikes color-coded by cluster.
+        Plot the classified zones along with the NIDAQ data and color-coded spikes.
 
         Parameters:
-        - data (pd.DataFrame): DataFrame containing spike information and cluster IDs.
-        - nidaq_time (np.array): The time array corresponding to the NIDAQ data.
+        - nidaq_time (np.array): The time array corresponding to the nidaq data.
         - nidaq_data (np.array): The NIDAQ data to plot.
+        - zone_df (pd.DataFrame): DataFrame with classified zones.
+        - spike_df (pd.DataFrame): DataFrame with spike information and cluster IDs.
+        - cluster_colors (np.array): Array of colors corresponding to each cluster.
+        - n_clusters (int): Number of clusters used in classification.
         - upper (float): The upper threshold for spike detection.
         - lower (float): The lower threshold for spike detection.
         """
-        data = data.replace('nan', pd.NA).dropna(axis=0)
-        plt.plot(nidaq_time, nidaq_data, linewidth=0.1)
-        unique_clusters = data['cluster_id'].unique()
-        num_clusters = len(unique_clusters)
-        cmap = plt.get_cmap('viridis', num_clusters)
-        legend_patches = []
+        # Define a consistent color map for both zones and spikes
+        cmap = plt.get_cmap('viridis', n_clusters)
+        cluster_colors = [cmap(i / n_clusters) for i in range(n_clusters)]
 
-        for cluster_id in unique_clusters:
-            color = cmap(cluster_id / num_clusters)
-            cluster_data = data[data['cluster_id'] == cluster_id]
+        plt.figure(figsize=(12, 6))
+        plt.plot(nidaq_time, nidaq_data, linewidth=0.5, color='gray', label='NIDAQ Data')
+
+        # Plot the classified zones
+        for _, row in zone_df.iterrows():
+            cluster_id = int(row['cluster_id'])
+            plt.axvspan(row['zone_start'], row['zone_end'], color=cluster_colors[cluster_id], alpha=0.3)
+
+        # Plot the spikes
+        for cluster_id in range(n_clusters):
+            color = cluster_colors[cluster_id]
+            cluster_data = spike_df[spike_df['cluster_id'] == cluster_id]
             plt.plot(cluster_data['time(s)'], cluster_data['amplitude(v)'], '.', color=color, alpha=0.75)
-            legend_patches.append(mpatches.Patch(color=color, label=f'Cluster {cluster_id}', alpha=0.75))
 
-        plt.ylim(-0.4, 0.9)
-        plt.axhline(y=upper, color='red', linewidth=0.3)
-        plt.axhline(y=lower, color='red', linewidth=0.3)
-        plt.legend(handles=legend_patches, loc='lower right')
-        plt.xlabel('Times (s)')
-        plt.ylabel('Nerve (v)')
-        plt.title('NIDAQ Nerve Spikes')
+        # Plot horizontal threshold lines
+        plt.axhline(y=upper, color='red', linewidth=0.3, label='Upper Threshold')
+        plt.axhline(y=lower, color='red', linewidth=0.3, label='Lower Threshold')
+
+        plt.xlabel('Time (s)')
+        plt.ylabel('Amplitude (V)')
+        plt.title('Classified Regions and Spike Clustering')
+
+        # Combine legends for zones and spikes
+        zone_handles = [plt.Line2D([0], [0], color=cluster_colors[i], lw=4, label=f'Zone {i}') for i in
+                        range(n_clusters)]
+        spike_handles = [mpatches.Patch(color=cluster_colors[i], label=f'Cluster {i}', alpha=0.75) for i in
+                         range(n_clusters)]
+        plt.legend(handles=zone_handles + spike_handles, loc='upper right')
+
         plt.show()
-
-        data.to_csv(f'{BASE_DIR}/data/data/{self.fileName}_g{self.gate}-data.csv', index=False)
 
     def filter_by_spike_density(self, data, time_window, min_spikes):
         """
@@ -204,3 +218,78 @@ class NIDAQ:
         df_filtered.loc[switch_indices, 'cluster_id'] = 1 - data.loc[switch_indices, 'cluster_id']
 
         return df_filtered
+
+    def define_zones(self, df, time_window):
+        """
+        Define contiguous zones based on the cluster ID and time proximity of spikes.
+
+        Parameters:
+        - df (pd.DataFrame): DataFrame containing spike information, including 'time(s)' and 'cluster_id'.
+        - time_window (float): Maximum allowable time gap between spikes to be considered in the same zone.
+
+        Returns:
+        - pd.DataFrame: DataFrame containing the start and end times of zones along with cluster IDs.
+        """
+        df = df.sort_values(by='time(s)')
+        zone_data = []
+        current_zone_start = df.iloc[0]['time(s)']
+        current_cluster_id = df.iloc[0]['cluster_id']
+
+        for i in range(1, len(df)):
+            time_diff = df.iloc[i]['time(s)'] - df.iloc[i - 1]['time(s)']
+
+            if time_diff > time_window or df.iloc[i]['cluster_id'] != current_cluster_id:
+                # End the current zone and start a new one
+                current_zone_end = df.iloc[i - 1]['time(s)']
+                zone_data.append({
+                    'zone_start': current_zone_start,
+                    'zone_end': current_zone_end,
+                    'cluster_id': current_cluster_id
+                })
+                current_zone_start = df.iloc[i]['time(s)']
+                current_cluster_id = df.iloc[i]['cluster_id']
+
+        # Append the last zone
+        current_zone_end = df.iloc[-1]['time(s)']
+        zone_data.append({
+            'zone_start': current_zone_start,
+            'zone_end': current_zone_end,
+            'cluster_id': current_cluster_id
+        })
+
+        return pd.DataFrame(zone_data)
+
+    def adjust_zone_boundaries(self,zone_df, merge_threshold=0.05):
+        """
+        Adjusts the boundaries between zones of different clusters if they are within a specified threshold.
+
+        Parameters:
+        - zone_df (pd.DataFrame): DataFrame containing start and end times of zones along with cluster IDs.
+        - merge_threshold (float): Time threshold (in seconds) within which adjacent zones should have their boundaries merged.
+
+        Returns:
+        - pd.DataFrame: DataFrame with adjusted start and end times of zones.
+        """
+        adjusted_zones = []
+        prev_zone = zone_df.iloc[0]
+
+        for i in range(1, len(zone_df)):
+            current_zone = zone_df.iloc[i]
+
+            # Check if the zones are from different clusters and are within the merge_threshold
+            if current_zone['zone_start'] - prev_zone['zone_end'] <= merge_threshold and prev_zone['cluster_id'] != \
+                    current_zone['cluster_id']:
+                # Calculate the midpoint and adjust both zones
+                midpoint = (prev_zone['zone_end'] + current_zone['zone_start']) / 2
+                prev_zone['zone_end'] = midpoint
+                current_zone['zone_start'] = midpoint
+
+            adjusted_zones.append(prev_zone)
+            prev_zone = current_zone
+
+        adjusted_zones.append(prev_zone)  # Append the last zone
+
+        return pd.DataFrame(adjusted_zones)
+
+    def export_csv(self, data):
+        data.to_csv(f'{BASE_DIR}/data/data/{self.fileName}_g{self.gate}-data.csv', index=False)
