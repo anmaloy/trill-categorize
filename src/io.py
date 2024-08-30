@@ -5,7 +5,7 @@ import numpy as np
 import os
 import glob
 import re
-import brainbox
+from src import readSGLX
 DATA_ROOT = Path(r'Y:\projects\frog\data')
 PROBE_MAP = {'imec0':'PBN','imec1':'Amb'}
 

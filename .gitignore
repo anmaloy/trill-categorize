@@ -1,6 +1,9 @@
 notebooks
 results
 data
+old code
 reports
+.venv
 *.pyc
 .ipynb_checkpoints
+scripts/temp.py
