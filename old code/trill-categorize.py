@@ -1,20 +1,11 @@
-import sys
-sys.path.append('..')
-from src import readSGLX
-from src.io import get_ni_analog
-
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import numpy as np
 import seaborn as sns
 import pandas as pd
 
-from pathlib import Path
-from scipy import signal
 from sklearn import preprocessing
 
 from matplotlib.colors import ListedColormap
-from scipy.signal import find_peaks, peak_prominences, peak_widths
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
@@ -28,6 +19,10 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from scripts import findpeaks
+from src.readSGLX import readMeta, SampRate
+from src.io import get_ni_analog
+
 
 def prepare_data(data, start=0, stop=0, drop=True):
     label_encoder = preprocessing.LabelEncoder()
@@ -168,51 +163,6 @@ def pca_comparison(data):
     plt.show()
 
 
-def spikes_chart(data, targets, nidaq_time, nidaq_data, cutoff):
-    data = data.replace('nan', pd.NA).dropna(axis=0)
-    plt.plot(nidaq_time, nidaq_data, linewidth=0.1)
-    for index, row in data.iterrows():
-        if row['type'] == 'S':
-            plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='tomato', alpha=0.75)
-        elif row['type'] == 'F':
-            plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='forestgreen', alpha=0.75)
-        elif row['type'] == 'I':
-            plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='gold', alpha=0.75)
-        elif row['type'] == 'VC':
-            plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='slateblue', alpha=0.75)
-        elif row['type'] == 'B':
-            plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='silver', alpha=0.75)
-        else:
-            plt.plot(data['time(s)'][index], data['amplitude(v)'][index], '.', color='black', alpha=0.75)
-        plt.hlines(data['hwidth(amp)'][index], data['hwidth(start)'][index], data['hwidth(finish)'][index], color="C2")
-    plt.ylim(-0.4, 0.9)
-    plt.axhline(y=cutoff, color='red', linewidth=0.3)
-    legend = [mpatches.Patch(color='yellow', label='Intro Trill', alpha=0.5),
-              mpatches.Patch(color='green', label='Fast Trill', alpha=0.5),
-              mpatches.Patch(color='red', label='Slow Trill', alpha=0.5),
-              mpatches.Patch(color='blue', label='Vocal Comp AP', alpha=0.5),
-              mpatches.Patch(color='grey', label='Breathing', alpha=0.5)]
-    plt.legend(handles=legend, loc='lower right')
-    plt.xlabel('Times (s)')
-    plt.ylabel('Nerve (v)')
-    plt.title('NIDAQ Nerve Spikes')
-    for index, row in targets.iterrows():
-        if row[3] == 'S':
-            plt.axvspan(row[1], row[2], color='red', alpha=0.25)
-        if row[3] == 'F':
-            plt.axvspan(row[1], row[2], color='green', alpha=0.25)
-        if row[3] == 'I':
-            plt.axvspan(row[1], row[2], color='yellow', alpha=0.25)
-        if row[3] == 'VC':
-            plt.axvspan(row[1], row[2], color='blue', alpha=0.25)
-        if row[3] == 'B':
-            plt.axvspan(row[1], row[2], color='grey', alpha=0.25)
-    plt.show()
-
-    # data.to_csv('data\\data.csv', index=False)
-    data.to_csv(f'data\\{fileName}_g{gate}-data.csv', index=False)
-
-
 def scatter_matrix(data):
     data = data.replace('nan', pd.NA).dropna(axis=0)
     data = data.drop('time(s)', axis=1)
@@ -221,57 +171,19 @@ def scatter_matrix(data):
     plt.show()
 
 
-def get_peaks(nidaq_time, nidaq_data, cutoff=0.04, distance=10, delay=0, other=False):
-    peaks, properties = find_peaks(nidaq_data, height=cutoff, threshold=0, distance=distance*sRate/1000)
-    width_half = peak_widths(nidaq_data, peaks, rel_height=0.5)
-    lst = list(width_half)
-    lst[0] = lst[0] / sRate
-    lst[2:] = (x / sRate for x in lst[2:])
-    width_half = tuple(lst)
-    lst[0] = lst[0] / sRate
-    lst[2:] = (x / sRate for x in lst[2:])
-    peaks_time = nidaq_time[peaks]
-    prominence = peak_prominences(nidaq_data, peaks)[0]
-    data, targets = populate_data(peaks_time, properties, width_half, prominence, delay)
-    if other is True:
-        data['type'] = data['type'].replace('nan', 'O')
-    return data, targets, cutoff
-
-
-def populate_data(peaks_time, properties, width_half, prominence, delay):
-    targets = pd.read_csv('data\\targets.csv')
-    targets.start = (targets.start + delay) / 1000
-    targets.end = (targets.end + delay) / 1000
-    data = pd.DataFrame()
-
-    data['time(s)'] = peaks_time
-    data['amplitude(v)'] = properties['peak_heights']
-    data['delay(s)'] = data['time(s)'].diff()
-    data['hwidth(len)'] = width_half[0]
-    data['hwidth(amp)'] = width_half[1]
-    data['hwidth(start)'] = width_half[2]
-    data['hwidth(finish)'] = width_half[3]
-    data['prominence'] = prominence
-    data['thresholds'] = properties['left_thresholds'] + properties['right_thresholds']
-    lst = targets.apply(lambda row: (row['start'], row['end']), axis=1)
-    conditions = [(data['time(s)'] > x[0]) & (data['time(s)'] < x[1]) for x in lst]
-    choices = targets.type.values
-    data['type'] = np.select(conditions, choices, default=np.nan)
-    return data, targets
-
-
-channel = 0
 fileName = 'NPX-S2-39'
 gate = 3
-# +~55ms (27_g0), +~120 (27_g7)
+channel = 0
 t_delay = 0
-binPath = Path(f'data\\{fileName}\\catgt_{fileName}_g{gate}\\{fileName}_g{gate}_tcat.nidq.bin')
-binMeta = readMeta(binPath)
+peaks = findpeaks.NIDAQ(fileName, gate)
+binMeta = readMeta(peaks.binPath)
 sRate = SampRate(binMeta)
-ni_time, ni_data = get_ni_analog(binPath, channel)
+ni_time, ni_data = get_ni_analog(peaks.binPath, channel)
+df, targetdf, p_cutoff = peaks.get_peaks(ni_time, ni_data, cutoff=(ni_data.std() * 2), samplerate=sRate, delay=t_delay,
+                                         other=False)
+peaks.spikes_chart(df, targetdf, ni_time, ni_data, p_cutoff)
+exit()
 
-df, targetdf, p_cutoff = get_peaks(ni_time, ni_data, delay=t_delay, other=False)
-spikes_chart(df, targetdf, ni_time, ni_data, p_cutoff)
 # pdf = nu_net(df)
 # plist = pdf.index.tolist()
 #

@@ -81,7 +81,9 @@ time_vector = np.linspace(-window_size, window_size, 2 * window_size + 1)
 
 plt.figure(figsize=(10, 6))
 for idx in selected_peaks:
-    peak_time = df.loc[idx, 'time(s)']
+    # 1: Detected peak time 2: Middle of half width
+    # peak_time = df.loc[idx, 'time(s)']
+    peak_time = df.loc[idx, 'width(mid)']
     cluster_id = df.loc[idx, 'cluster_id']
     peak_idx = np.searchsorted(ni_time, peak_time)
     start_idx = max(0, peak_idx - window_size)
@@ -108,27 +110,28 @@ buffer_size = 0.1  # 100 ms
 min_zone_length = 0.3  # 300ms
 
 
-# Step 1: Define zones based on spike proximity and cluster ID
+# Define zones based on spike proximity and cluster ID
 zone_df = peaks.define_zones(filtered_df, time_window)
 
 # Step 2: Adjust the zone boundaries to eliminate gaps and filter out very short zones
 adjusted_zone_df = peaks.adjust_zone_boundaries(zone_df, merge_threshold)
 adjusted_zone_df = adjusted_zone_df[(adjusted_zone_df['zone_end'] - adjusted_zone_df['zone_start']) >= min_zone_length]
 filtered_df = filtered_df[filtered_df.apply(lambda row: any(
-    (row['time(s)'] >= start) and (row['time(s)'] <= end)
+    # (row['time(s)'] >= start) and (row['time(s)'] <= end)
+    (row['width(mid)'] >= start) and (row['width(mid)'] <= end)
     for start, end in zip(adjusted_zone_df['zone_start'], adjusted_zone_df['zone_end'])), axis=1)]
 
-# Step 3: Plot the NIDAQ data with the adjusted zones
+# Plot the NIDAQ data with the adjusted zones
 peaks.spikes_chart(ni_time, ni_data, adjusted_zone_df, filtered_df, n_clusters, upper_thresh, lower_thresh)
 
-# Step 4: Request user input to name each cluster group
+# Request user input to name each cluster group
 cluster_names = {}
 for cluster_id in range(n_clusters):
     cluster_name = input(f"What is cluster {cluster_id}? ")
     cluster_names[cluster_id] = cluster_name
 
-# Step 5: Apply the names to the DataFrame
+# Apply the names to the DataFrame
 adjusted_zone_df['cluster_id'] = adjusted_zone_df['cluster_id'].map(cluster_names)
 
-# Step 6: Save as CSV
+# Save as CSV
 peaks.export_csv(adjusted_zone_df)

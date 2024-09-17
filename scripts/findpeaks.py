@@ -84,6 +84,7 @@ class NIDAQ:
             'width(amp)': widths[1],
             'width(start)': widths[2],
             'width(finish)': widths[3],
+            'width(mid)': (widths[2]+widths[3])/2,
             'prominence': prominence,
             'thresholds': properties['left_thresholds'] + properties['right_thresholds']
         }
@@ -259,7 +260,7 @@ class NIDAQ:
 
         return pd.DataFrame(zone_data)
 
-    def adjust_zone_boundaries(self,zone_df, merge_threshold=0.05):
+    def adjust_zone_boundaries(self, zone_df, merge_threshold=0.05):
         """
         Adjusts the boundaries between zones of different clusters if they are within a specified threshold.
 
