@@ -16,10 +16,12 @@ much easier!
 
 """
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from pathlib import Path
 from tkinter import Tk
 from tkinter import filedialog
+matplotlib.use('TkAgg')  # Ensure proper rendering of charts
 
 
 # Parse ini file returning a dictionary whose keys are the metadata
@@ -31,6 +33,7 @@ from tkinter import filedialog
 # fucntions. Note that python 3 has no size limit for integers.
 #
 def readMeta(binFullPath):
+    print(binFullPath)
     metaName = binFullPath.stem + ".meta"
     metaPath = Path(binFullPath.parent / metaName)
     metaDict = {}

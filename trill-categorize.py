@@ -113,7 +113,7 @@ min_zone_length = 0.3  # 300ms
 # Define zones based on spike proximity and cluster ID
 zone_df = peaks.define_zones(filtered_df, time_window)
 
-# Step 2: Adjust the zone boundaries to eliminate gaps and filter out very short zones
+# Adjust the zone boundaries to eliminate gaps and filter out very short zones
 adjusted_zone_df = peaks.adjust_zone_boundaries(zone_df, merge_threshold)
 adjusted_zone_df = adjusted_zone_df[(adjusted_zone_df['zone_end'] - adjusted_zone_df['zone_start']) >= min_zone_length]
 filtered_df = filtered_df[filtered_df.apply(lambda row: any(
